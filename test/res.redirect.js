@@ -1,6 +1,6 @@
 
 var express = require('../')
-  , request = require('./support/http');
+  , request = require('supertest');
 
 describe('res', function(){
   describe('.redirect(url)', function(){
@@ -13,169 +13,8 @@ describe('res', function(){
 
       request(app)
       .get('/')
-      .end(function(err, res){
-        res.statusCode.should.equal(302);
-        res.headers.should.have.property('location', 'http://google.com');
-        done();
-      })
-    })
-
-    describe('with leading //', function(){
-      it('should pass through scheme-relative urls', function(done){
-        var app = express();
-
-        app.use(function(req, res){
-          res.redirect('//cuteoverload.com');
-        });
-
-        request(app)
-        .get('/')
-        .set('Host', 'example.com')
-        .end(function(err, res){
-          res.headers.should.have.property('location', '//cuteoverload.com');
-          done();
-        })
-      })
-    })
-
-    
-    describe('with leading /', function(){
-      it('should construct scheme-relative urls', function(done){
-        var app = express();
-
-        app.use(function(req, res){
-          res.redirect('/login');
-        });
-
-        request(app)
-        .get('/')
-        .set('Host', 'example.com')
-        .end(function(err, res){
-          res.headers.should.have.property('location', '//example.com/login');
-          done();
-        })
-      })
-    })
-
-    describe('with leading ./', function(){
-      it('should construct path-relative urls', function(done){
-        var app = express();
-
-        app.use(function(req, res){
-          res.redirect('./edit');
-        });
-
-        request(app)
-        .get('/post/1')
-        .set('Host', 'example.com')
-        .end(function(err, res){
-          res.headers.should.have.property('location', '//example.com/post/1/./edit');
-          done();
-        })
-      })
-    })
-
-    describe('with leading ../', function(){
-      it('should construct path-relative urls', function(done){
-        var app = express();
-
-        app.use(function(req, res){
-          res.redirect('../new');
-        });
-
-        request(app)
-        .get('/post/1')
-        .set('Host', 'example.com')
-        .end(function(err, res){
-          res.headers.should.have.property('location', '//example.com/post/1/../new');
-          done();
-        })
-      })
-    })
-    
-    describe('without leading /', function(){
-      it('should construct mount-point relative urls', function(done){
-        var app = express();
-
-        app.use(function(req, res){
-          res.redirect('login');
-        });
-
-        request(app)
-        .get('/')
-        .set('Host', 'example.com')
-        .end(function(err, res){
-          res.headers.should.have.property('location', '//example.com/login');
-          done();
-        })
-      })
-    })
-    
-    describe('when mounted', function(){
-      describe('deeply', function(){
-        it('should respect the mount-point', function(done){
-          var app = express()
-            , blog = express()
-            , admin = express();
-
-          admin.use(function(req, res){
-            res.redirect('login');
-          });
-
-          app.use('/blog', blog);
-          blog.use('/admin', admin);
-
-          request(app)
-          .get('/blog/admin')
-          .set('Host', 'example.com')
-          .end(function(err, res){
-            res.headers.should.have.property('location', '//example.com/blog/admin/login');
-            done();
-          })
-        })
-      })
-
-      describe('omitting leading /', function(){
-        it('should respect the mount-point', function(done){
-          var app = express()
-            , admin = express();
-
-          admin.use(function(req, res){
-            res.redirect('admin/login');
-          });
-
-          app.use('/blog', admin);
-
-          request(app)
-          .get('/blog')
-          .set('Host', 'example.com')
-          .end(function(err, res){
-            res.headers.should.have.property('location', '//example.com/blog/admin/login');
-            done();
-          })
-        })
-      })
-
-      describe('providing leading /', function(){
-        it('should ignore mount-point', function(done){
-          var app = express()
-            , admin = express();
-
-          admin.use(function(req, res){
-            res.redirect('/admin/login');
-          });
-
-          app.use('/blog', admin);
-
-          request(app)
-          .get('/blog')
-          .set('Host', 'example.com')
-          .end(function(err, res){
-            res.headers.should.have.property('location', '//example.com/admin/login');
-            done();
-          })
-        })
-      })
+      .expect('location', 'http://google.com')
+      .expect(302, done)
     })
   })
 
@@ -196,7 +35,25 @@ describe('res', function(){
       })
     })
   })
-  
+
+  describe('.redirect(url, status)', function(){
+    it('should set the response status', function(done){
+      var app = express();
+
+      app.use(function(req, res){
+        res.redirect('http://google.com', 303);
+      });
+
+      request(app)
+      .get('/')
+      .end(function(err, res){
+        res.statusCode.should.equal(303);
+        res.headers.should.have.property('location', 'http://google.com');
+        done();
+      })
+    })
+  })
+
   describe('when the request method is HEAD', function(){
     it('should ignore the body', function(done){
       var app = express();
@@ -214,7 +71,7 @@ describe('res', function(){
       })
     })
   })
-  
+
   describe('when accepting html', function(){
     it('should respond with html', function(done){
       var app = express();
@@ -245,12 +102,27 @@ describe('res', function(){
       .set('Host', 'http://example.com')
       .set('Accept', 'text/html')
       .end(function(err, res){
-        res.text.should.equal('<p>Moved Temporarily. Redirecting to <a href="//http://example.com/&lt;lame&gt;">//http://example.com/&lt;lame&gt;</a></p>');
+        res.text.should.equal('<p>Moved Temporarily. Redirecting to <a href="&lt;lame&gt;">&lt;lame&gt;</a></p>');
         done();
       })
     })
+
+    it('should include the redirect type', function(done){
+      var app = express();
+
+      app.use(function(req, res){
+        res.redirect(301, 'http://google.com');
+      });
+
+      request(app)
+      .get('/')
+      .set('Accept', 'text/html')
+      .expect('Content-Type', /html/)
+      .expect('Location', 'http://google.com')
+      .expect(301, '<p>Moved Permanently. Redirecting to <a href="http://google.com">http://google.com</a></p>', done);
+    })
   })
-  
+
   describe('when accepting text', function(){
     it('should respond with text', function(done){
       var app = express();
@@ -269,6 +141,38 @@ describe('res', function(){
         done();
       })
     })
+
+    it('should encode the url', function(done){
+      var app = express();
+
+      app.use(function(req, res){
+        res.redirect('http://example.com/?param=<script>alert("hax");</script>');
+      });
+
+      request(app)
+      .get('/')
+      .set('Host', 'http://example.com')
+      .set('Accept', 'text/plain, */*')
+      .end(function(err, res){
+        res.text.should.equal('Moved Temporarily. Redirecting to http://example.com/?param=%3Cscript%3Ealert(%22hax%22);%3C/script%3E');
+        done();
+      })
+    })
+
+    it('should include the redirect type', function(done){
+      var app = express();
+
+      app.use(function(req, res){
+        res.redirect(301, 'http://google.com');
+      });
+
+      request(app)
+      .get('/')
+      .set('Accept', 'text/plain, */*')
+      .expect('Content-Type', /plain/)
+      .expect('Location', 'http://google.com')
+      .expect(301, 'Moved Permanently. Redirecting to http://google.com', done);
+    })
   })
 
   describe('when accepting neither text or html', function(){
@@ -281,13 +185,12 @@ describe('res', function(){
 
       request(app)
       .get('/')
-      .set('Accept', 'foo/bar')
-      .end(function(err, res){
-        res.should.have.status(302);
-        res.headers.should.have.property('location', 'http://google.com');
+      .set('Accept', 'application/octet-stream')
+      .expect('location', 'http://google.com')
+      .expect('content-length', '0')
+      .expect(302, '', function(err, res){
+        if (err) return done(err)
         res.headers.should.not.have.property('content-type');
-        res.headers.should.have.property('content-length', '0');
-        res.text.should.equal('');
         done();
       })
     })

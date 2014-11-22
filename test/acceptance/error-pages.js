@@ -1,6 +1,6 @@
 
 var app = require('../../examples/error-pages')
-  , request = require('../support/http');
+  , request = require('supertest');
 
 describe('error-pages', function(){
   describe('GET /', function(){
@@ -85,7 +85,7 @@ describe('error-pages', function(){
         request(app)
         .get('/404')
         .set('Accept', 'text/plain')
-        .expect(200)
+        .expect(404)
         .expect('Not found', done);
       })
     })

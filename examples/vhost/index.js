@@ -1,50 +1,51 @@
-
 /**
  * Module dependencies.
  */
 
 var express = require('../..');
+var logger = require('morgan');
+var vhost = require('vhost');
 
-// Edit /etc/vhosts
+/*
+edit /etc/hosts:
 
-// First app
+127.0.0.1       foo.example.com
+127.0.0.1       bar.example.com
+127.0.0.1       example.com
+*/
 
-var one = express();
+// Main server app
 
-one.use(express.logger());
+var main = express();
 
-one.get('/', function(req, res){
-  res.send('Hello from app one!')
+if (!module.parent) main.use(logger('dev'));
+
+main.get('/', function(req, res){
+  res.send('Hello from main app!');
 });
 
-one.get('/:sub', function(req, res){
-  res.send('requsted ' + req.params.sub);
-});
-
-// App two
-
-var two = express();
-
-two.get('/', function(req, res){
-  res.send('Hello from app two!')
+main.get('/:sub', function(req, res){
+  res.send('requested ' + req.params.sub);
 });
 
 // Redirect app
 
 var redirect = express();
 
-redirect.all('*', function(req, res){
-  console.log(req.subdomains);
-  res.redirect('http://localhost:3000/' + req.subdomains[0]);
+redirect.use(function(req, res){
+  if (!module.parent) console.log(req.vhost);
+  res.redirect('http://example.com:3000/' + req.vhost[0]);
 });
 
-// Main app
+// Vhost app
 
-var app = express();
+var app = module.exports = express();
 
-app.use(express.vhost('*.localhost', redirect))
-app.use(express.vhost('localhost', one));
-app.use(express.vhost('dev', two));
+app.use(vhost('*.example.com', redirect)); // Serves all subdomains via Redirect app
+app.use(vhost('example.com', main)); // Serves top level domain via Main server app
 
-app.listen(3000);
-console.log('Express app started on port 3000');
+/* istanbul ignore next */
+if (!module.parent) {
+  app.listen(3000);
+  console.log('Express started on port 3000');
+}
